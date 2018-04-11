@@ -194,7 +194,12 @@ func (f Formation) Merge(other Formation) Formation {
 			p.Quantity = existing.Quantity
 			p.SetConstraints(existing.Constraints())
 		} else {
-			p.Quantity = DefaultQuantities[name]
+			p.Quantity = -1
+			val, ok := DefaultQuantities[name]
+			if ok {
+				p.Quantity = val
+			}
+
 			p.SetConstraints(DefaultConstraints)
 		}
 
