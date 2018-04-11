@@ -70,9 +70,6 @@ func (r *runnerService) Run(ctx context.Context, opts RunOpts) error {
 		return err
 	}
 	for _, p := range a.Processes {
-		p.Stdin = opts.Stdin
-		p.Stdout = opts.Stdout
-		p.Stderr = opts.Stderr
 		p.Labels["empire.user"] = opts.User.Name
 
 		// Add additional environment variables to the process.
@@ -81,5 +78,5 @@ func (r *runnerService) Run(ctx context.Context, opts RunOpts) error {
 		}
 	}
 
-	return r.Scheduler.Run(ctx, a)
+	return r.Scheduler.Run(ctx, a, opts.Input, opts.Output)
 }

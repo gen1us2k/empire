@@ -1,14 +1,8 @@
 package cli_test
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/remind101/empire/empiretest"
-)
-
-func TestRunDetached(t *testing.T) {
-	empiretest.SkipCI(t)
-
+func testRunDetached(t *testing.T) {
 	run(t, []Command{
 		DeployCommand("latest", "v1"),
 		{
@@ -18,14 +12,12 @@ func TestRunDetached(t *testing.T) {
 	})
 }
 
-func TestRunAttached(t *testing.T) {
-	empiretest.SkipCI(t)
-
+func testRunAttached(t *testing.T) {
 	run(t, []Command{
 		DeployCommand("latest", "v1"),
 		{
 			"run migration -a acme-inc",
-			"Attaching to container\nFake output for `[migration]` on acme-inc",
+			"Fake output for `migration` on acme-inc",
 		},
 	})
 }

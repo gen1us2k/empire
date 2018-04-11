@@ -1546,7 +1546,7 @@ func TestScheduler_Run_Detached(t *testing.T) {
 				Command: []string{"bundle exec rake db:migrate"},
 			},
 		},
-	})
+	}, nil, nil)
 	assert.NoError(t, err)
 
 	e.AssertExpectations(t)
@@ -1663,12 +1663,11 @@ func TestScheduler_Run_Attached(t *testing.T) {
 
 	stdin := strings.NewReader("ls\n")
 	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
 	d.On("AttachToContainer", docker.AttachToContainerOptions{
 		Container:    "4c01db0b339c",
 		InputStream:  stdin,
 		OutputStream: stdout,
-		ErrorStream:  stderr,
+		ErrorStream:  stdout,
 		Logs:         true,
 		Stream:       true,
 		Stdin:        true,
@@ -1684,15 +1683,12 @@ func TestScheduler_Run_Attached(t *testing.T) {
 			&twelvefactor.Process{
 				Type:    "run",
 				Command: []string{"bundle", "exec", "rake", "db:migrate"},
-				Stdin:   stdin,
-				Stdout:  stdout,
-				Stderr:  stderr,
 			},
 		},
-	})
+	}, stdin, stdout)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "Attaching to task/fdf2c302-468c-4e55-b884-5331d816e7fb...\r\n", stderr.String())
+	assert.Equal(t, "Attaching to task/fdf2c302-468c-4e55-b884-5331d816e7fb...\r\n", stdout.String())
 
 	e.AssertExpectations(t)
 	c.AssertExpectations(t)

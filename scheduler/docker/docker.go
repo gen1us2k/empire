@@ -72,19 +72,14 @@ func RunAttachedWithDocker(s twelvefactor.Scheduler, client *dockerutil.Client) 
 
 // Run runs attached processes using the docker scheduler, and detached
 // processes using the wrapped scheduler.
-func (s *AttachedScheduler) Run(ctx context.Context, app *twelvefactor.Manifest) error {
-	if len(app.Processes) != 1 {
-		return fmt.Errorf("docker: cannot run mutliple processes with attached scheduler")
-	}
-
-	p := app.Processes[0]
+func (s *AttachedScheduler) Run(ctx context.Context, app *twelvefactor.Manifest, in io.Reader, out io.Writer) error {
 	// Attached means stdout, stdin is attached.
-	attached := p.Stdin != nil || p.Stdout != nil || p.Stderr != nil
+	attached := out != nil || in != nil
 
 	if attached {
-		return s.dockerScheduler.Run(ctx, app)
+		return s.dockerScheduler.Run(ctx, app, in, out)
 	} else {
-		return s.Scheduler.Run(ctx, app)
+		return s.Scheduler.Run(ctx, app, in, out)
 	}
 }
 
@@ -151,14 +146,14 @@ func NewScheduler(client *dockerutil.Client) *Scheduler {
 	}
 }
 
-func (s *Scheduler) Run(ctx context.Context, app *twelvefactor.Manifest) error {
+func (s *Scheduler) Run(ctx context.Context, app *twelvefactor.Manifest, in io.Reader, out io.Writer) error {
+	attached := out != nil || in != nil
+
+	if !attached {
+		return errors.New("cannot run detached processes with Docker scheduler")
+	}
+
 	for _, p := range app.Processes {
-		attached := p.Stdin != nil || p.Stdout != nil || p.Stderr != nil
-
-		if !attached {
-			return errors.New("cannot run detached processes with Docker scheduler")
-		}
-
 		labels := twelvefactor.Labels(app, p)
 		labels[runLabel] = Attached
 
@@ -166,7 +161,7 @@ func (s *Scheduler) Run(ctx context.Context, app *twelvefactor.Manifest) error {
 		if err != nil {
 			return err
 		}
-		pullOptions.OutputStream = replaceNL(p.Stderr)
+		pullOptions.OutputStream = replaceNL(out)
 
 		if err := s.docker.PullImage(ctx, pullOptions); err != nil {
 			return fmt.Errorf("error pulling image: %v", err)
@@ -205,12 +200,13 @@ func (s *Scheduler) Run(ctx context.Context, app *twelvefactor.Manifest) error {
 		if err := s.docker.StartContainer(ctx, container.ID, nil); err != nil {
 			return fmt.Errorf("error starting container: %v", err)
 		}
+		defer tryClose(out)
 
 		if err := s.docker.AttachToContainer(ctx, docker.AttachToContainerOptions{
 			Container:    container.ID,
-			InputStream:  p.Stdin,
-			OutputStream: p.Stdout,
-			ErrorStream:  p.Stderr,
+			InputStream:  in,
+			OutputStream: out,
+			ErrorStream:  out,
 			Logs:         true,
 			Stream:       true,
 			Stdin:        true,
@@ -318,6 +314,14 @@ func envKeys(env map[string]string) []string {
 	}
 
 	return s
+}
+
+func tryClose(w io.Writer) error {
+	if w, ok := w.(io.Closer); ok {
+		return w.Close()
+	}
+
+	return nil
 }
 
 // replaceNL returns an io.Writer that will replace "\n" with "\r\n" in the
